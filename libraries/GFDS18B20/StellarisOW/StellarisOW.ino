@@ -1,31 +1,32 @@
-// Used code examples from the GFDS18B20 Library. Author is listed below:
+// StellarisOW
+// Have used arrays to hold retrieved information, so that it can be easily addressed by your code
+// This sketch plus StellarisDS18B20.h will run as is on 430 & Stellaris LaunchPads
+// Do a reset to view the One Wire ROM addresses. Have Fun.
 // Grant Forest 29 Jan 2013.
+// Had confusion with library names. Lib now called GFDS18B20
+// GF 6 Feb 2913  cleaned up a bit of code.
 
+//#include <StellarisDS18B20.h>
 #include <GFDS18B20.h>
 
-#define LED GREEN_LED
-#define OWPIN  11  //9
+#define OWPIN  9  //11
 #define MAXOW 10  //Max number of OW's used
 
-// Global Variables
 byte ROMarray[MAXOW][8];
 byte ROMtype[MAXOW];     // 28 for temp', 12 for switch etc.
 byte ROMtemp[MAXOW];
 byte result[MAXOW+5];
+
 byte data[12];
 byte i;
 byte addr[8];
 uint8_t ROMmax=0;
 uint8_t ROMcount=0;
 boolean foundOW =false;
-DS18B20 ds(OWPIN);  // currently on PIN 11
 
+DS18B20 ds(OWPIN);  // currently on PIN 11
 void setup(void) {
-  //set all pins low
-  //P1_0 - _7
-  //P2-0 - _6
-  //P3-0 - _3_6
-  pinMode(LED, OUTPUT); 
+ 
   Serial.begin(9600);
   delay(500);
   Serial.print("G'day StellarisOW\n");
@@ -34,8 +35,6 @@ void setup(void) {
 }
 
 void loop(void) {
-  // Get data from one wire bus
-  digitalWrite(LED, HIGH);  // LED on
   tempCMD();
   for (i=1; i<ROMmax+1;i++){
       if (ROMtype[i]==0x28) {
@@ -43,7 +42,6 @@ void loop(void) {
          saveTemperature(i);
        }
   }  
-  digitalWrite(LED, LOW);  // LED off
   for (i=1;i<ROMmax+1;i++){
     if (ROMtype[i]==0x28) {
         foundOW=true;
@@ -55,10 +53,7 @@ void loop(void) {
      }  
  } 
  if (foundOW) Serial.println(); 
- // Get timestamp from RTC (lib at 430h)
- // Write to SD card (spoof)
- // Sleep in LPM3 for 600
- sleepSeconds(5); 
+ delay(500); 
 }
 
 void tempCMD(void){      //Send a global temperature convert command
@@ -75,11 +70,6 @@ void saveTemperature(uint8_t ROMno){
   result[ROMno]=byte(newtemp32);
   i=(data[0] & 0x0F)* 625/1000;
   if (i>=5)  result[ROMno]++;
-}
-
-void pushLow(int pin){
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, LOW);
 }
 void readOW(uint8_t ROMno)
 {

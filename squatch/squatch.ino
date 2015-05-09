@@ -29,6 +29,7 @@ DS18B20 ds(OWPIN);
  // Debug mode will display information via the serial port. 
  //  An on-board LED (red) will indicate it is in debug mode
 boolean debug_mode = true; 
+uint16_t duration; // seconds to sleep. unsigned short has a max value of 65,535 (seconds)
 
 void setup(void) {
   //set all pins low
@@ -38,46 +39,34 @@ void setup(void) {
   //P3-0 - _3_6
   if(debug_mode) {
     debug_init();
+    duration = 5;  // shorter sleep duration
     debug_findOW();
     displayOW();
   }
   else {
     findOW();
+    duration = 600;  // 10 min sleep duration
   }
  
   rtc.begin();
   rtc.setTimeStringFormat(true, true, false, true, false);  // (use_24hr=True, use_shortwords, day_before_month, short_date_notation, include_seconds)
 }
 
-void loop(void) {
-  char current_time[64];   // Temporary char[] buffer to hold time string
-  // Get data from one wire bus
+void loop(void) { 
+  // 1. Get data from one wire bus
   tempCMD();
   for (i=1; i<ROMmax+1;i++){
       if (ROMtype[i]==0x28) {
          readOW(i); 
          saveTemperature(i);
        }
-  }  
-  for (i=1;i<ROMmax+1;i++){
-    if (ROMtype[i]==0x28) {
-        foundOW=true;
-         Serial.print("Sensor ");
-         Serial.print(i);
-         Serial.print(":");
-         prt2((result[i]*625)/100);
-         Serial.print("C ");
-        
-         Serial.print("\t Time: ");
-         rtc.getTimeString(current_time);
-         Serial.println(current_time);
-     }  
- } 
- if (foundOW) Serial.println(); 
- // Get timestamp from RTC (lib at 430h)
- // Write to SD card (spoof)
- // Sleep in LPM3 for 600
- sleepSeconds(60); 
+  }
+  // 2. record data and timestamp either to serial port or SD card 
+ if (debug_mode) print_temps(); 
+ else write_temps();
+
+ // 3. Sleep in LPM3 for specified duration
+ sleepSeconds(duration); 
 
 }
 
@@ -87,11 +76,12 @@ void tempCMD(void){      //Send a global temperature convert command
   ds.write_byte(0x44);  // start conversion, with parasite power on at the end
   delay(1000);
 }
+
 void saveTemperature(uint8_t ROMno){
   result[ROMno]=(int32_t)((data[1] <<8) | data [0]);
 }
 
-// Sets a pin to output and low in order to conserve power
+// Sets pin to output mode and low in order to conserve power
 void pushLow(int pin){
   pinMode(pin, OUTPUT);
   digitalWrite(pin, LOW);
@@ -111,7 +101,9 @@ void readOW(uint8_t ROMno)
 #endif   
   }
 }
-// findOW without using the Serial port
+
+// searches for attached sensors and adds their address to an array
+// without using the Serial port
 void findOW(void)
 {
  byte addr[8]; 
@@ -132,12 +124,13 @@ void findOW(void)
  } 
 }
 
-// findOW for debug mode (uses serial port)
+// searches for attached sensors and adds their address to an array
+// for debug mode (uses serial port)
 void debug_findOW(void)
 {
  byte addr[8]; 
  uint8_t i; 
- ROMmax=0;  ///////////////////////////////////////////////////////
+ ROMmax=0;  //
  while (true){  //get all the OW addresses on the buss
    i= ds.search(addr);
    if ( i<10) {
@@ -168,7 +161,7 @@ void debug_findOW(void)
  } 
 }
 
-
+// only to be called in debug mode. displays connected sensors
 void displayOW(void)
 {
   uint8_t i;
@@ -193,7 +186,49 @@ void prt2(int x){
 void debug_init(){
   pinMode(LED, OUTPUT);
   digitalWrite(LED, HIGH); 
+
   Serial.begin(9600);
   delay(500);
-  Serial.print("Squatch Temp Array\n DEBUG MODE\n");
+  Serial.print("Squatch Temp Array\n DEBUG MODE\n"); 
 }
+
+// only to be called in debug mode. prints temps to serial port
+void print_temps(){
+    char current_time[64];   // Temporary char[] buffer to hold time string
+    for (i=1;i<ROMmax+1;i++){
+    if (ROMtype[i]==0x28) {
+        foundOW=true;
+         Serial.print("Sensor ");
+         Serial.print(i);
+         Serial.print(":");
+         prt2((result[i]*625)/100);
+         Serial.print("C ");
+        
+         Serial.print("\t Time: ");
+         rtc.getTimeString(current_time);
+         Serial.println(current_time);
+     }  
+ }
+ if (foundOW) Serial.println();  
+}
+// writes temps to imaginary sd card
+void write_temps(){
+    char current_time[64];   // Temporary char[] buffer to hold time string
+   /* for (i=1;i<ROMmax+1;i++){
+    if (ROMtype[i]==0x28) {
+        foundOW=true;
+         Serial.print("Sensor ");
+         Serial.print(i);
+         Serial.print(":");
+         prt2((result[i]*625)/100);
+         Serial.print("C ");
+        
+         Serial.print("\t Time: ");
+         rtc.getTimeString(current_time);
+         Serial.println(current_time);
+     }  
+ }
+ if (foundOW) Serial.println();  
+ */
+}
+// TODO: button interrupt for debug mode. sd writing

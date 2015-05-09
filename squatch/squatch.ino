@@ -33,23 +33,23 @@ uint16_t duration; // seconds to sleep. unsigned short has a max value of 65,535
 
 void setup(void) {
   //set all pins low
-  //P1_0 - _7
-  pushLow(P1_0);
-  //P2-0 - _6
-  //P3-0 - _3_6
+  pushLow(P1_2); pushLow(P1_3); pushLow(P1_4); pushLow(P1_5); pushLow(P1_6); pushLow(P1_7);
+  pushLow(P2_0); pushLow(P2_1); pushLow(P2_2); pushLow(P2_4); pushLow(P2_5); pushLow(P2_6);
+  pushLow(P3_0); pushLow(P3_4); pushLow(P3_5); pushLow(P3_6);
+  
   if(debug_mode) {
     debug_init();
-    duration = 5;  // shorter sleep duration
-    debug_findOW();
-    displayOW();
+    findOW();
+    //displayOW();
   }
   else {
     findOW();
     duration = 600;  // 10 min sleep duration
   }
- 
-  rtc.begin();
+  pinMode(PUSH2, INPUT_PULLUP);
+  attachInterrupt(PUSH2, test_low, FALLING);
   rtc.setTimeStringFormat(true, true, false, true, false);  // (use_24hr=True, use_shortwords, day_before_month, short_date_notation, include_seconds)
+  rtc.begin(); 
 }
 
 void loop(void) { 
@@ -160,12 +160,14 @@ void debug_findOW(void)
     
  } 
 }
+void test_low(){
+  digitalWrite(LED, LOW);
+}
 
 // only to be called in debug mode. displays connected sensors
 void displayOW(void)
 {
   uint8_t i;
-  Serial.println ("From array");
   for (ROMcount=1; ROMcount<ROMmax+1; ROMcount++) {   
   ds.reset();
     for( i = 0; i < 8; i++) {
@@ -184,9 +186,10 @@ void prt2(int x){
 }
 
 void debug_init(){
+  debug_mode = true;
   pinMode(LED, OUTPUT);
   digitalWrite(LED, HIGH); 
-
+  duration = 5;  // shorter sleep duration
   Serial.begin(9600);
   delay(500);
   Serial.print("Squatch Temp Array\n DEBUG MODE\n"); 
@@ -209,7 +212,6 @@ void print_temps(){
          Serial.println(current_time);
      }  
  }
- if (foundOW) Serial.println();  
 }
 // writes temps to imaginary sd card
 void write_temps(){

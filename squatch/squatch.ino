@@ -5,14 +5,15 @@
 //------------(_/-
 //Used code examples from the GFDS18B20 Library. Author is listed below:
 // Grant Forest 29 Jan 2013.
+// Adapted MKinsey 2015
 
 #include <GFDS18B20.h>  // One Wire Library for ds18b20 sensor
 #include <RTC_B.h>      // Library for interacting with the on-board RTC_B
 
-
-#define LED RED_LED
+#define LED RED_LED  // Chose red becuase it is more likely to make a user consult the manual
+                     // and to show that it should NOT be left on in the field.
 #define OWPIN  P1_3  // p1.3
-#define MAXOW 100  //Max number of OW's used
+#define MAXOW 100  //Max number of sensors used
 
 // Global Variables
 byte ROMarray[MAXOW][8];
@@ -28,7 +29,7 @@ boolean foundOW =false;
 DS18B20 ds(OWPIN);
  // Debug mode will display information via the serial port. 
  //  An on-board LED (red) will indicate it is in debug mode
-boolean debug_mode = true; 
+boolean debug_mode = false; 
 uint16_t duration; // seconds to sleep. unsigned short has a max value of 65,535 (seconds)
 
 void setup(void) {
@@ -36,19 +37,20 @@ void setup(void) {
   pushLow(P1_2); pushLow(P1_3); pushLow(P1_4); pushLow(P1_5); pushLow(P1_6); pushLow(P1_7);
   pushLow(P2_0); pushLow(P2_1); pushLow(P2_2); pushLow(P2_4); pushLow(P2_5); pushLow(P2_6);
   pushLow(P3_0); pushLow(P3_4); pushLow(P3_5); pushLow(P3_6);
+  pushLow(P4_0); pushLow(P4_1); pushLow(P4_2); pushLow(P4_3); pushLow(P4_5); pushLow(P4_6);
+  pushLow(PJ_0); pushLow(PJ_1); pushLow(PJ_2); pushLow(PJ_3);
   
-  if(debug_mode) {
-    debug_init();
-    findOW();
-    //displayOW();
-  }
-  else {
-    findOW();
-    duration = 600;  // 10 min sleep duration
-  }
+  Serial.begin(9600);
+  delay(500);
+  pinMode(LED, OUTPUT);
+  debug_toggle();
+  findOW();
+  
+  // Button two (S2) toggles debug mode
   pinMode(PUSH2, INPUT_PULLUP);
-  attachInterrupt(PUSH2, test_low, FALLING);
-  rtc.setTimeStringFormat(true, true, false, true, false);  // (use_24hr=True, use_shortwords, day_before_month, short_date_notation, include_seconds)
+  attachInterrupt(PUSH2, debug_toggle, FALLING);
+  rtc.setTimeStringFormat(true, true, false, true, false);  
+  // params: (use_24hr=True, use_shortwords, day_before_month, short_date_notation, include_seconds)
   rtc.begin(); 
 }
 
@@ -63,7 +65,7 @@ void loop(void) {
   }
   // 2. record data and timestamp either to serial port or SD card 
  if (debug_mode) print_temps(); 
- else write_temps();
+ else            write_temps();
 
  // 3. Sleep in LPM3 for specified duration
  sleepSeconds(duration); 
@@ -103,30 +105,7 @@ void readOW(uint8_t ROMno)
 }
 
 // searches for attached sensors and adds their address to an array
-// without using the Serial port
 void findOW(void)
-{
- byte addr[8]; 
- uint8_t i; 
- ROMmax=0;  ///////////////////////////////////////////////////////
- while (true){  //get all the OW addresses on the buss
-   i= ds.search(addr);
-   if ( i<10) {
-      ds.reset_search();
-      delay(500);
-      return;
-    }
-    for( i = 0; i < 8; i++) {
-       if (i==0)  ROMtype[ROMmax+1]=addr[i];  // store the device type       
-      ROMarray[ROMmax+1][i]=addr[i];     
-    }
-    ROMmax++;  
- } 
-}
-
-// searches for attached sensors and adds their address to an array
-// for debug mode (uses serial port)
-void debug_findOW(void)
 {
  byte addr[8]; 
  uint8_t i; 
@@ -160,9 +139,6 @@ void debug_findOW(void)
     
  } 
 }
-void test_low(){
-  digitalWrite(LED, LOW);
-}
 
 // only to be called in debug mode. displays connected sensors
 void displayOW(void)
@@ -185,14 +161,20 @@ void prt2(int x){
   Serial.print(x%100);
 }
 
-void debug_init(){
-  debug_mode = true;
-  pinMode(LED, OUTPUT);
-  digitalWrite(LED, HIGH); 
-  duration = 5;  // shorter sleep duration
-  Serial.begin(9600);
-  delay(500);
-  Serial.print("Squatch Temp Array\n DEBUG MODE\n"); 
+void debug_toggle(){
+
+  debug_mode = !debug_mode;  // toggle debug mode
+
+  if(debug_mode){
+    duration = 5;  // 5 second sleep duration
+    digitalWrite(LED, HIGH); 
+    Serial.print("Squatch Temp Array\n DEBUG MODE\n");
+    displayOW(); 
+  }
+  else {
+    digitalWrite(LED, LOW);
+    duration = 600; // 10 min sleep duration  
+  }
 }
 
 // only to be called in debug mode. prints temps to serial port
@@ -233,4 +215,4 @@ void write_temps(){
  if (foundOW) Serial.println();  
  */
 }
-// TODO: button interrupt for debug mode. sd writing
+
